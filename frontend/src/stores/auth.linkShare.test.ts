@@ -69,7 +69,7 @@ describe('link share auth query lifecycle', () => {
 	it('removes the previous user query cache when entering a link share', async () => {
 		const store = useAuthStore()
 		store.setAuthenticated(true)
-		store.setUser({id: 1, type: AUTH_TYPES.USER} as never, false)
+		store.setUser({id: 1, type: AUTH_TYPES.USER} as never)
 		queryClient.setQueryData(labelKeys.all, [{id: 1, title: 'private'}])
 		queryClient.setQueryData(['projects'], [{id: 1, title: 'private'}])
 		const linkToken = jwt(AUTH_TYPES.LINK_SHARE, 2)

@@ -171,7 +171,7 @@ describe('base store identity reset', () => {
 		const baseStore = useBaseStore()
 		await baseStore.appReady
 
-		authStore.setUser({id: 1, type: AUTH_TYPES.USER} as never, false)
+		authStore.setUser({id: 1, type: AUTH_TYPES.USER} as never)
 		seedProjectWithBackground(42)
 
 		baseStore.setCurrentProject(project(42))
@@ -180,7 +180,7 @@ describe('base store identity reset', () => {
 		expect(baseStore.currentProjectId).toBe(42)
 		await vi.waitFor(() => expect(baseStore.background).toBe('blob:new-background'))
 
-		authStore.setUser(next as never, false)
+		authStore.setUser(next as never)
 
 		if (!resets) {
 			expect(baseStore.background).toBe('blob:new-background')

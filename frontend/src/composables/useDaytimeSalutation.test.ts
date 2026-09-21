@@ -1,7 +1,9 @@
+import {queryClient} from '@/client/queryClient'
+import {accountKeys} from '@/client/queries/account'
 import {describe, it, expect, beforeEach} from 'vitest'
 import {setActivePinia, createPinia} from 'pinia'
 import {createI18n} from 'vue-i18n'
-import {defineComponent, h, ref, type Ref} from 'vue'
+import {defineComponent, h, nextTick, ref, type Ref} from 'vue'
 import {mount} from '@vue/test-utils'
 
 import {useDaytimeSalutation} from './useDaytimeSalutation'
@@ -35,15 +37,17 @@ function runSalutation(now: Ref<Date>): string | undefined {
 	return result
 }
 
-function setUser() {
+async function setUser() {
 	const authStore = useAuthStore()
 	authStore.setUser({
 		id: 42,
 		name: 'Ada',
 		username: 'ada',
-		type: AUTH_TYPES.LINK_SHARE,
+		type: AUTH_TYPES.USER,
 		created: '2024-01-15T10:00:00Z',
-	} as never, false)
+	} as never)
+	queryClient.setQueryData(accountKeys.user(42), {id: 42, name: 'Ada', created: '2024-01-15T10:00:00Z'})
+	await nextTick()
 }
 
 describe('useDaytimeSalutation', () => {
@@ -56,8 +60,8 @@ describe('useDaytimeSalutation', () => {
 		expect(runSalutation(now)).toBeUndefined()
 	})
 
-	it('is deterministic for the same user, date, and bucket', () => {
-		setUser()
+	it('is deterministic for the same user, date, and bucket', async () => {
+		await setUser()
 		const now = ref(makeDate('2026-04-06T09:00:00'))
 		const first = runSalutation(now)
 		const second = runSalutation(now)
@@ -66,8 +70,8 @@ describe('useDaytimeSalutation', () => {
 		expect(first).toBe(second)
 	})
 
-	it('produces a string from the morning pool on a Monday morning', () => {
-		setUser()
+	it('produces a string from the morning pool on a Monday morning', async () => {
+		await setUser()
 		const now = ref(makeDate('2026-04-06T09:00:00'))
 		const result = runSalutation(now)
 
@@ -84,8 +88,8 @@ describe('useDaytimeSalutation', () => {
 		expect(morningStrings).toContain(result)
 	})
 
-	it('includes the Friday extra in the pool on Friday morning', () => {
-		setUser()
+	it('includes the Friday extra in the pool on Friday morning', async () => {
+		await setUser()
 		const reachable = new Set<string>()
 		for (let day = 3; day <= 31; day += 7) {
 			const iso = `2026-04-${String(day).padStart(2, '0')}T09:00:00`
@@ -95,8 +99,8 @@ describe('useDaytimeSalutation', () => {
 		expect(reachable.size).toBeGreaterThan(1)
 	})
 
-	it('uses different buckets for different hours', () => {
-		setUser()
+	it('uses different buckets for different hours', async () => {
+		await setUser()
 		const dateStr = '2026-04-06'
 		const morning = runSalutation(ref(makeDate(`${dateStr}T09:00:00`)))
 		const day = runSalutation(ref(makeDate(`${dateStr}T14:00:00`)))
@@ -110,8 +114,8 @@ describe('useDaytimeSalutation', () => {
 		expect(new Set([morning, day, evening, night]).size).toBeGreaterThan(1)
 	})
 
-	it('produces different results across consecutive days', () => {
-		setUser()
+	it('produces different results across consecutive days', async () => {
+		await setUser()
 		const results = new Set<string>()
 		for (let day = 1; day <= 14; day++) {
 			const iso = `2026-04-${String(day).padStart(2, '0')}T09:00:00`
