@@ -36,7 +36,10 @@
 				inputmode="numeric"
 				@keyup.enter="totpConfirm"
 			/>
-			<XButton @click="totpConfirm">
+			<XButton
+				:loading="enableMutation.isPending.value"
+				@click="totpConfirm"
+			>
 				{{ $t('misc.confirm') }}
 			</XButton>
 		</template>
@@ -64,6 +67,7 @@
 				/>
 				<XButton
 					danger
+					:loading="disableMutation.isPending.value"
 					@click="totpDisable"
 				>
 					{{ $t('user.settings.totp.disable') }}
@@ -119,6 +123,7 @@ const enableMutation = useEnableTotpMutation()
 const disableMutation = useDisableTotpMutation()
 
 async function totpConfirm() {
+	if (enableMutation.isPending.value) return
 	try {
 		await enableMutation.mutateAsync(totpConfirmPasscode.value)
 		await authStore.logout()
@@ -131,6 +136,7 @@ function closeDisableForm() {
 }
 
 async function totpDisable() {
+	if (disableMutation.isPending.value) return
 	try {
 		await disableMutation.mutateAsync(totpDisablePassword.value)
 	} catch {
