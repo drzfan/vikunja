@@ -1,12 +1,21 @@
 import {computed, readonly, ref, watch} from 'vue'
 import {acceptHMRUpdate, defineStore} from 'pinia'
 
-import {AuthenticatedHTTPFactory, HTTPFactory} from '@/helpers/fetcher'
-import {getBrowserLanguage, i18n, setLanguage} from '@/i18n'
-import {objectToSnakeCase, objectToCamelCase} from '@/helpers/case'
+import {
+	authLogin,
+	authRegister,
+	authOpenidCallback,
+	authLinkShare as authenticateLinkShare,
+	authLogout,
+	authConfirmEmail,
+	tokenRenew,
+	userShow,
+} from '@/client/generated' 
+import {getBrowserLanguage, i18n, setLanguage, type SupportedLocale} from '@/i18n'
+import {objectToCamelCase} from '@/helpers/case'
 import {getDisplayName, invalidateAvatarCache} from '@/helpers/user'
 import AvatarService from '@/services/avatar'
-import type {RegisterUserRequestWritable, UserInfoBody} from '@/client/generated'
+import type {RegisterUserRequestWritable, UserInfoBody, VikunjaErrorModel} from '@/client/generated'
 import {registerViaInviteLink} from '@/client/inviteLink'
 import {parseValidationErrors} from '@/helpers/parseValidationErrors'
 import UserSettingsService from '@/services/userSettings'
@@ -225,23 +234,23 @@ export const useAuthStore = defineStore('auth', () => {
 
 	// Logs a user in with a set of credentials.
 	async function login(credentials) {
-		const HTTP = HTTPFactory()
 		setIsLoading(true)
 
 		// Delete an eventually preexisting old token
 		removeToken()
 
 		try {
-			const response = await HTTP.post('login', objectToSnakeCase(credentials))
+			const response = await authLogin({body: {username: credentials.username, password: credentials.password, totp_passcode: credentials.totpPasscode, long_token: credentials.longToken}})
 			// Save the token to local storage for later use
+			if (!response.data.token) throw new Error('Authentication response has no token')
 			saveToken(response.data.token, true)
+			lastUserInfoRefresh.value = null
 
 			// Tell others the user is authenticated
 			await checkAuth()
 		} catch (e) {
 			if (
-				e.response &&
-				e.response.data.code === 1017 &&
+				(e as VikunjaErrorModel)?.code === 1017 &&
 				!credentials.totpPasscode
 			) {
 				setNeedsTotpPasscode(true)
@@ -258,7 +267,6 @@ export const useAuthStore = defineStore('auth', () => {
 	 * Not sure if this is the right place to put the logic in, maybe a separate js component would be better suited. 
 	 */
 	async function register(credentials, language: string|null = null, viaInvite = false) {
-		const HTTP = HTTPFactory()
 		setIsLoading(true)
 		
 		if (!language) {
@@ -269,11 +277,11 @@ export const useAuthStore = defineStore('auth', () => {
 			if (viaInvite) {
 				await registerViaInviteLink({...credentials, language})
 			} else {
-				await HTTP.post('register', {...credentials, language})
+				await authRegister({body: {...credentials, language}})
 			}
 			return await login(credentials)
 		} catch (e) {
-			const problem = e.response?.data ?? e
+			const problem = e as VikunjaErrorModel & {message?: string}
 			if (problem.code === 2002 && parseValidationErrors(problem).language) {
 				return register(credentials, 'en', viaInvite)
 			}
@@ -296,7 +304,6 @@ export const useAuthStore = defineStore('auth', () => {
 	}
 
 	async function openIdAuth({provider, code, totpPasscode}: {provider: string, code: string, totpPasscode?: string}) {
-		const HTTP = HTTPFactory()
 		setIsLoading(true)
 		setLoggedInVia(null)
 
@@ -313,9 +320,11 @@ export const useAuthStore = defineStore('auth', () => {
 		// Delete an eventually preexisting old token
 		removeToken()
 		try {
-			const response = await HTTP.post(`/auth/openid/${provider}/callback`, data)
+			const response = await authOpenidCallback({path: {provider}, body: data})
 			// Save the token to local storage for later use
+			if (!response.data.token) throw new Error('Authentication response has no token')
 			saveToken(response.data.token, true)
+			lastUserInfoRefresh.value = null
 			setLoggedInVia(provider)
 
 			// Tell others the user is authenticated
@@ -330,6 +339,7 @@ export const useAuthStore = defineStore('auth', () => {
 		try {
 			removeToken()
 			saveToken(tokens.access_token, true)
+			lastUserInfoRefresh.value = null
 			localStorage.setItem('desktopOAuthRefreshToken', tokens.refresh_token)
 			await checkAuth()
 		} finally {
@@ -338,16 +348,15 @@ export const useAuthStore = defineStore('auth', () => {
 	}
 
 	async function linkShareAuth({hash, password}) {
-		const HTTP = HTTPFactory()
-		const response = await HTTP.post('/shares/' + hash + '/auth', {
-			password: password,
-		})
+		const response = await authenticateLinkShare({path: {share: hash}, body: {password}})
+		if (!response.data.token) throw new Error('Authentication response has no token')
 		saveToken(response.data.token, false)
 		// Reset the debounce so checkAuth() actually parses the new link share
 		// JWT instead of silently returning due to the 1-minute throttle.
 		lastUserInfoRefresh.value = null
 		await checkAuth()
-		return response.data
+		if (!response.data.project_id) throw new Error('Link share response has no project')
+		return {...response.data, project_id: response.data.project_id}
 	}
 
 	/**
@@ -456,17 +465,16 @@ export const useAuthStore = defineStore('auth', () => {
 			return
 		}
 
-		const HTTP = AuthenticatedHTTPFactory()
 		try {
-			const response = await HTTP.get('user')
+			const response = await userShow()
 			const newUser = {
 				...response.data,
-				...(info.value?.type && {type: info.value?.type}),
-				...(info.value?.exp && {exp: info.value?.exp}),
+				type: info.value?.type ?? AUTH_TYPES.USER,
+				exp: info.value?.exp ?? 0,
 			}
 
 			if (newUser.settings?.language) {
-				await setLanguage(newUser.settings.language)
+				await setLanguage(newUser.settings.language as SupportedLocale)
 			}
 
 			setUser(newUser)
@@ -474,8 +482,9 @@ export const useAuthStore = defineStore('auth', () => {
 
 			return newUser
 		} catch (e) {
-			if((e?.response?.status >= 400 && e?.response?.status < 500) ||
-				e?.response?.data?.message === 'missing, malformed, expired or otherwise invalid token provided') {
+			const problem = e as VikunjaErrorModel
+			if(((problem?.status ?? 0) >= 400 && (problem?.status ?? 0) < 500) ||
+				problem?.detail === 'missing, malformed, expired or otherwise invalid token provided') {
 				await logout()
 				return
 			}
@@ -493,10 +502,10 @@ export const useAuthStore = defineStore('auth', () => {
 		if (token) {
 			const stopLoading = setModuleLoading(setIsLoading)
 			try {
-				await HTTPFactory().post('user/confirm', {token})
+				await authConfirmEmail({body: {token}})
 				return true
 			} catch(e) {
-				throw new Error(e.response.data.message, {cause: e})
+				throw new Error((e as VikunjaErrorModel)?.detail, {cause: e})
 			} finally {
 				localStorage.removeItem('emailConfirmToken')
 				stopLoading()
@@ -555,8 +564,8 @@ export const useAuthStore = defineStore('auth', () => {
 		try {
 			if (isLinkShareAuth.value) {
 				// Link shares renew via the dedicated link-share endpoint (JWT-based).
-				const HTTP = AuthenticatedHTTPFactory()
-				const response = await HTTP.post('user/token')
+				const response = await tokenRenew()
+				if (!response.data.token) throw new Error('Authentication response has no token')
 				saveToken(response.data.token, false)
 			} else {
 				// User sessions renew via the refresh-token cookie.
@@ -569,7 +578,7 @@ export const useAuthStore = defineStore('auth', () => {
 			// — the 401 interceptor will handle it when the token really expires.
 			const nowInSeconds = Date.now() / MILLISECONDS_A_SECOND
 			const isExpired = !info.value?.exp || info.value.exp < nowInSeconds
-			if (isExpired && (e?.cause?.request?.status || e?.cause?.response?.status)) {
+			if (isExpired && (e?.cause?.request?.status || e?.cause?.status)) {
 				await logout()
 			}
 		}
@@ -583,8 +592,7 @@ export const useAuthStore = defineStore('auth', () => {
 		// Best-effort: if the network call fails, still clean up locally.
 		let oidcLogoutUrl = ''
 		try {
-			const HTTP = AuthenticatedHTTPFactory()
-			const {data} = await HTTP.post('user/logout')
+			const {data} = await authLogout()
 			oidcLogoutUrl = data?.oidc_logout_url ?? ''
 		} catch (_e) {
 			// Ignore — session will expire naturally
