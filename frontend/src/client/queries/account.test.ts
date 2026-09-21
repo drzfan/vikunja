@@ -1,11 +1,11 @@
 import {beforeEach, describe, expect, it, vi} from 'vitest'
 import {QueryClient} from '@tanstack/vue-query'
 import {accountKeys, updateSettingsMutationOptions} from './account'
-import {invalidateAvatarCache} from '@/helpers/user'
+import {invalidateAvatarQueries} from './avatars'
 const sdk = vi.hoisted(() => ({userUpdateSettings: vi.fn(), userShow: vi.fn(), userGetAvatarProvider: vi.fn()}))
 vi.mock('@/client/generated', () => sdk)
 vi.mock('@/message', () => ({error: vi.fn(), success: vi.fn()}))
-vi.mock('@/helpers/user', () => ({invalidateAvatarCache: vi.fn()}))
+vi.mock('./avatars', () => ({invalidateAvatarQueries: vi.fn()}))
 
 describe('account settings mutations', () => {
 	beforeEach(() => {vi.clearAllMocks()})
@@ -14,6 +14,7 @@ describe('account settings mutations', () => {
 		const previous = {
 			id: 1,
 			is_admin: true,
+			username: 'ada',
 			name: 'Old',
 			settings: {name: 'Old'},
 		}
@@ -33,14 +34,15 @@ describe('account settings mutations', () => {
 		expect(client.getQueryData(accountKeys.user(1))).toEqual({
 			id: 1,
 			is_admin: true,
+			username: 'ada',
 			name: 'New',
 			settings: {
 				name: 'New',
 				frontend_settings: {sidebar_width: 280},
 			},
 		})
-		await vi.waitFor(() => expect(invalidateAvatarCache).toHaveBeenCalledTimes(1))
-		expect(invalidateAvatarCache).toHaveBeenCalledWith(previous)
+		await vi.waitFor(() => expect(invalidateAvatarQueries).toHaveBeenCalledTimes(1))
+		expect(invalidateAvatarQueries).toHaveBeenCalledWith('ada')
 	})
 	it('leaves cached settings intact when the server rejects an update', async () => {
 		const client = new QueryClient()

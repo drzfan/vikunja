@@ -8,7 +8,7 @@ import {
 import type {UserGeneralSettingsWritable, UserInfoBody} from '@/client/generated'
 import {queryClient} from '@/client/queryClient'
 import {contextMutationOptions} from './contextMutation'
-import {invalidateAvatarCache} from '@/helpers/user'
+import {invalidateAvatarQueries} from './avatars'
 import {i18n, setLanguage, type SupportedLocale} from '@/i18n'
 import {error} from '@/message'
 
@@ -67,9 +67,10 @@ export function updateSettingsMutationOptions() {
 				} : current,
 			)
 			if (settings.language) setLanguage(settings.language as SupportedLocale).catch(error)
-			if (previous && previous.name !== settings.name) {
+			if (previous?.username && previous.name !== settings.name) {
+				const {username} = previous
 				void userGetAvatarProvider().then(({data}) => {
-					if (data.avatar_provider === 'initials') invalidateAvatarCache(previous)
+					if (data.avatar_provider === 'initials') invalidateAvatarQueries(username)
 				}).catch(() => {})
 			}
 		},
