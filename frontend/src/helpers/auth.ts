@@ -1,4 +1,4 @@
-import {getApiBaseUrl} from '@/helpers/apiUrl'
+import {getApiBaseUrl, getLegacyApiBaseUrl} from '@/helpers/apiUrl'
 import {authRefreshToken} from '@/client/generated'
 import {createClient} from '@/client/generated/client'
 import {isDesktopApp, refreshDesktopToken} from '@/helpers/desktopAuth'
@@ -181,7 +181,7 @@ async function doRefresh(persist: boolean): Promise<void> {
 					return
 				}
 				// Migrate the old path-scoped refresh cookie; all other requests use v2.
-				response = await authRefreshToken({client: refreshClient, baseUrl: getApiBaseUrl().replace(/\/api\/v2\/$/, '/api/v1/').replace(/\/$/, '')})
+				response = await authRefreshToken({client: refreshClient, baseUrl: getLegacyApiBaseUrl().replace(/\/$/, '')})
 			}
 			if (loggedOutSinceStart()) {
 				return
