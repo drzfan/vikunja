@@ -7,7 +7,7 @@ import {
 	type ClientRequestContext,
 } from '@/client/requestContext'
 import {getToken, getTokenIdentity, refreshToken} from '@/helpers/auth'
-import {getApiV2BaseUrl} from '@/helpers/fetcher'
+import {getApiBaseUrl} from '@/helpers/apiUrl'
 import {AUTH_TYPES} from '@/constants/auth'
 
 async function getProblemCode(response: Response): Promise<number | null> {
@@ -64,7 +64,7 @@ async function fenceResponseBody(
 
 export function configureApiClient(): void {
 	client.setConfig({
-		baseUrl: getApiV2BaseUrl(),
+		baseUrl: getApiBaseUrl(),
 		credentials: 'include',
 		throwOnError: true,
 	})

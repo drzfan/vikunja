@@ -9,17 +9,7 @@ import {useAuthStore} from '@/stores/auth'
 import {AUTH_TYPES} from '@/constants/auth'
 import en from '@/i18n/lang/en.json'
 
-vi.mock('@/helpers/fetcher', () => {
-	const httpStub = () => Object.assign(
-		vi.fn(async () => ({data: new Blob()})),
-		{
-			get: vi.fn(async () => ({data: []})),
-			post: vi.fn(async () => ({data: {}})),
-			interceptors: {request: {use: vi.fn()}, response: {use: vi.fn()}},
-		},
-	)
-	return {AuthenticatedHTTPFactory: httpStub, HTTPFactory: httpStub}
-})
+
 
 const i18n = createI18n({legacy: false, locale: 'en', messages: {en}})
 

@@ -1,4 +1,4 @@
-import {getApiBaseUrl, getApiV2BaseUrl} from '@/helpers/fetcher'
+import {getApiBaseUrl} from '@/helpers/apiUrl'
 import {authRefreshToken} from '@/client/generated'
 import {createClient} from '@/client/generated/client'
 import {isDesktopApp, refreshDesktopToken} from '@/helpers/desktopAuth'
@@ -172,7 +172,7 @@ async function doRefresh(persist: boolean): Promise<void> {
 			let response
 			// A per-request baseUrl skips mergeConfigs (utils.gen.ts), the only place a trailing slash is stripped.
 			try {
-				response = await authRefreshToken({client: refreshClient, baseUrl: getApiV2BaseUrl().replace(/\/$/, '')})
+				response = await authRefreshToken({client: refreshClient, baseUrl: getApiBaseUrl().replace(/\/$/, '')})
 			} catch (e) {
 				if ((e as {status?: number})?.status === 429) {
 					throw e
