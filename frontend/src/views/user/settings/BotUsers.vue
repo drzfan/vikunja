@@ -34,10 +34,9 @@ const newBotName = ref('')
 const createError = ref<string | null>(null)
 const showCreateForm = ref(false)
 
-const queryableBots = computed(() => bots.value.filter(bot => bot.id > 0))
-const tokenQueries = useQueries({queries: computed(() => queryableBots.value.map(bot => apiTokensQuery(bot.id)))})
+const tokenQueries = useQueries({queries: computed(() => bots.value.map(bot => apiTokensQuery(bot.id)))})
 const tokensByBot = computed(() => Object.fromEntries(
-	queryableBots.value.map((bot, index) => [bot.id, tokenQueries.value[index]?.data ?? []]),
+	bots.value.map((bot, index) => [bot.id, tokenQueries.value[index]?.data ?? []]),
 ))
 const newTokensByBot = ref<Record<number, string>>({})
 const showTokenForm = ref<Record<number, boolean>>({})
