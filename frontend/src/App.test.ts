@@ -9,8 +9,6 @@ import {useAuthStore} from '@/stores/auth'
 import {AUTH_TYPES} from '@/constants/auth'
 import en from '@/i18n/lang/en.json'
 
-
-
 const i18n = createI18n({legacy: false, locale: 'en', messages: {en}})
 
 const AppRoute = {template: '<div class="app-route">app route</div>'}

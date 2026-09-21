@@ -13,8 +13,6 @@ import en from '@/i18n/lang/en.json'
 
 vi.mock('@/client/generated', () => ({userTimezones: vi.fn(async () => ({data: []}))}))
 
-
-
 vi.mock('@/message', () => ({
 	success: vi.fn(),
 	error: vi.fn(),
