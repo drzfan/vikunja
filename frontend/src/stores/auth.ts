@@ -466,7 +466,7 @@ export const useAuthStore = defineStore('auth', () => {
 			const response = await userShow()
 			const newUser = {
 				...response.data,
-				type: info.value?.type ?? AUTH_TYPES.USER,
+				type: info.value?.type ?? AUTH_TYPES.UNKNOWN,
 				exp: info.value?.exp ?? 0,
 			}
 
