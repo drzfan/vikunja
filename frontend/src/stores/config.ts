@@ -78,9 +78,9 @@ export const useConfigStore = defineStore('config', () => {
 	const apiBase = computed(() => {
 		const {host, protocol, pathname} = parseURL(window.API_URL)
 
-		// Strip the /api/v1 suffix (and optional trailing slash) to get the deployment base.
+		// Keep the deployment prefix for non-API links.
 		const basePath = pathname
-			.replace(/\/api\/v1\/?$/, '')
+			.replace(/\/api\/v[12]\/?$/, '')
 			.replace(/\/+$/, '')
 		return `${protocol}//${host}${basePath}`
 	})
